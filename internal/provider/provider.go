@@ -51,6 +51,7 @@ type AnthropicProviderModel struct {
 	AdminApiKey types.String `tfsdk:"admin_api_key"`
 	AuthToken   types.String `tfsdk:"auth_token"`
 	Federation  types.Object `tfsdk:"federation"`
+	BaseURL     types.String `tfsdk:"base_url"`
 }
 
 func (p *AnthropicProvider) Metadata(ctx context.Context, req provider.MetadataRequest, resp *provider.MetadataResponse) {
@@ -79,6 +80,12 @@ func (p *AnthropicProvider) Schema(ctx context.Context, req provider.SchemaReque
 					"Can also be set via the ANTHROPIC_AUTH_TOKEN environment variable.",
 			},
 			"federation": federationSchema(),
+			"base_url": schema.StringAttribute{
+				Optional: true,
+				Description: "Base URL the SDK clients send requests and token exchanges to. Takes precedence over the " +
+					"ANTHROPIC_BASE_URL environment variable, which otherwise applies; set it to pin the provider to " +
+					"the real API when that variable points somewhere else, such as an inference proxy.",
+			},
 		},
 	}
 }
@@ -95,6 +102,7 @@ func (p *AnthropicProvider) Configure(ctx context.Context, req provider.Configur
 	apiKey := resolveCredential(data.ApiKey, "ANTHROPIC_API_KEY")
 	adminApiKey := resolveCredential(data.AdminApiKey, "ANTHROPIC_ADMIN_API_KEY")
 	authToken := resolveCredential(data.AuthToken, "ANTHROPIC_AUTH_TOKEN")
+	baseURL := resolveCredential(data.BaseURL, "ANTHROPIC_BASE_URL")
 
 	federation, diags := resolveFederation(ctx, data.Federation)
 	resp.Diagnostics.Append(diags...)
@@ -125,19 +133,19 @@ func (p *AnthropicProvider) Configure(ctx context.Context, req provider.Configur
 	// the environment contributed on its own — see newSDKClient.
 	pd := &providerdata.ProviderData{}
 	if apiKey != "" {
-		pd.Client = newSDKClient(option.WithAPIKey(apiKey))
+		pd.Client = newSDKClient(option.WithAPIKey(apiKey), baseURL)
 	}
 	if adminApiKey != "" {
 		pd.AdminClient = admin.NewClient(adminApiKey)
 	}
 	if authToken != "" {
-		pd.OAuthClient = &providerdata.OAuthClient{Client: newSDKClient(option.WithAuthToken(authToken))}
+		pd.OAuthClient = &providerdata.OAuthClient{Client: newSDKClient(option.WithAuthToken(authToken), baseURL)}
 	}
 	if federation != nil {
 		// The SDK caches the exchanged token and exchanges again shortly
 		// before it expires, calling the identity source each time.
 		pd.OAuthClient = &providerdata.OAuthClient{Client: newSDKClient(
-			option.WithFederationTokenProvider(federation.identity, federation.options),
+			option.WithFederationTokenProvider(federation.identity, federation.options), baseURL,
 		)}
 	}
 
@@ -179,13 +187,13 @@ func resolveCredential(configValue types.String, envVar string) string {
 // stamp its workspace_id on every request — neither of which appears anywhere
 // in the Terraform configuration.
 //
-// The provider resolves credentials itself, so the only environment variable
-// still worth honouring is ANTHROPIC_BASE_URL, which the marker option also
-// skips. It is read with an explicit emptiness check: an exported-but-empty
-// value must not replace the SDK's production default with "".
-func newSDKClient(credential option.RequestOption) *anthropic.Client {
+// The provider resolves credentials itself, and the base URL too: baseURL is
+// the base_url attribute or else ANTHROPIC_BASE_URL, already resolved by the
+// caller. An empty value keeps the SDK's production default rather than
+// replacing it with "".
+func newSDKClient(credential option.RequestOption, baseURL string) *anthropic.Client {
 	opts := []option.RequestOption{option.WithoutEnvironmentDefaults(), credential}
-	if baseURL := os.Getenv("ANTHROPIC_BASE_URL"); baseURL != "" {
+	if baseURL != "" {
 		opts = append(opts, option.WithBaseURL(baseURL))
 	}
 

@@ -141,6 +141,7 @@ provider "anthropic" {}
 - `admin_api_key` (String, Sensitive) The Anthropic Admin API key for organization management endpoints (workspaces, members). Can also be set via the ANTHROPIC_ADMIN_API_KEY environment variable.
 - `api_key` (String, Sensitive) The Anthropic API key. Can also be set via the ANTHROPIC_API_KEY environment variable.
 - `auth_token` (String, Sensitive) An org:admin OAuth bearer token (`sk-ant-oat01-...`) for endpoints that reject API keys, such as the Workload Identity Federation admin endpoints. Can also be set via the ANTHROPIC_AUTH_TOKEN environment variable.
+- `base_url` (String) Base URL the SDK clients send requests and token exchanges to. Takes precedence over the ANTHROPIC_BASE_URL environment variable, which otherwise applies; set it to pin the provider to the real API when that variable points somewhere else, such as an inference proxy.
 - `federation` (Attributes) Obtain the org:admin OAuth bearer token through Workload Identity Federation instead of `auth_token`. The provider exchanges an identity token from your platform (a CI OIDC token, a Kubernetes projected service account token, an Entra token...) for an Anthropic access token, and exchanges again before it expires, fetching a fresh identity token each time. Every attribute but `workspace_id` falls back to the environment variable the Anthropic SDKs read. Conflicts with `auth_token`. (see [below for nested schema](#nestedatt--federation))
 
 <a id="nestedatt--federation"></a>

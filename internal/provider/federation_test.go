@@ -348,3 +348,34 @@ func TestCommandIdentityTokenRejectsEmptyOutput(t *testing.T) {
 		t.Errorf("err = %v, want an empty-output error", err)
 	}
 }
+
+// TestConfigureBaseURLOverridesEnvironment covers an ANTHROPIC_BASE_URL that
+// points somewhere else, such as an inference proxy: base_url keeps both the
+// token exchange and the API requests on the configured endpoint.
+func TestConfigureBaseURLOverridesEnvironment(t *testing.T) {
+	fs := newFederationServer(t, 3600)
+	elsewhere := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("request reached ANTHROPIC_BASE_URL: %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	t.Cleanup(elsewhere.Close)
+
+	clearCredentialEnv(t)
+	t.Setenv("ANTHROPIC_BASE_URL", elsewhere.URL)
+
+	pd := providerDataFrom(t, configureProvider(t, map[string]tftypes.Value{
+		"base_url": tftypes.NewValue(tftypes.String, fs.URL),
+		"federation": federationValue(t, map[string]tftypes.Value{
+			"organization_id":        tftypes.NewValue(tftypes.String, "00000000-0000-0000-0000-000000000000"),
+			"federation_rule_id":     tftypes.NewValue(tftypes.String, "fdrl_rule"),
+			"identity_token_command": stringList(countingTokenScript(t)),
+		}),
+	}))
+
+	if err := pd.OAuthClient.Get(context.Background(), "/v1/models", nil, nil); err != nil {
+		t.Fatalf("request failed: %v", err)
+	}
+	if exchanges, _ := fs.snapshot(); len(exchanges) != 1 {
+		t.Errorf("exchanges = %d, want 1", len(exchanges))
+	}
+}
