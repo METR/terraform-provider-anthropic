@@ -135,8 +135,8 @@ func TestConfigureAuthTokenAloneIsSufficient(t *testing.T) {
 	if pd.Client != nil {
 		t.Error("Client should be nil when api_key is not configured")
 	}
-	if pd.AdminClient != nil {
-		t.Error("AdminClient should be nil when admin_api_key is not configured")
+	if pd.AdminClient == nil || pd.AdminClient.ApiKey != "" {
+		t.Error("AdminClient should authenticate through the auth_token bearer when admin_api_key is not configured")
 	}
 }
 

@@ -135,8 +135,11 @@ func TestConfigureFederationExchangesAndRefreshes(t *testing.T) {
 	if pd.OAuthClient == nil || pd.OAuthClient.Client == nil {
 		t.Fatal("federation did not produce an OAuth client")
 	}
-	if pd.Client != nil || pd.AdminClient != nil {
-		t.Error("federation alone must not produce the API-key clients")
+	if pd.Client != nil {
+		t.Error("federation alone must not produce the API-key client")
+	}
+	if pd.AdminClient == nil || pd.AdminClient.ApiKey != "" {
+		t.Error("federation should back the Admin API client with its bearer")
 	}
 
 	for range 2 {

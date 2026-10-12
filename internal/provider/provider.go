@@ -141,6 +141,12 @@ func (p *AnthropicProvider) Configure(ctx context.Context, req provider.Configur
 		)}
 	}
 
+	// An org:admin bearer reaches the whole Admin API, so without an Admin API
+	// key the organization management resources use the bearer instead.
+	if pd.AdminClient == nil && pd.OAuthClient != nil {
+		pd.AdminClient = admin.NewSDKClient(pd.OAuthClient.Client)
+	}
+
 	resp.DataSourceData = pd
 	resp.ResourceData = pd
 }

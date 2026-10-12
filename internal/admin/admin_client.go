@@ -108,7 +108,9 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body any) (
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP request: %w", err)
 	}
-	req.Header.Set("x-api-key", c.ApiKey)
+	if c.ApiKey != "" {
+		req.Header.Set("x-api-key", c.ApiKey)
+	}
 	req.Header.Set("anthropic-version", AnthropicVersion)
 	if reqBody != nil {
 		req.Header.Set("content-type", "application/json")
